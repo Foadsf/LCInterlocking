@@ -273,24 +273,56 @@ def make_tabs_joins(parts, tabs):
             removeParts[keyid] = []
         removeParts[keyid].append(tab.freecad_object.Name)
 
-    for tab in tabs:
-        tab_part = None
-        other_parts = []
-        keyid = str(tab.group_id)
+    # Whether a hole (or tab) gets kerf compensation and a dog bone at one of its ends depends on whether the
+    # panel's material continues past that end. Where two joints meet in one panel (a box corner), the other
+    # joint's hole removes that material, so judging against the uncut panel left a thin strip that the dog
+    # bone then cut loose: a floor joined with Continuous joints came out as several solids. So: a first pass
+    # records what each joint removes from each panel, and the second pass, which builds the parts, judges
+    # every end against the panel without what the other joints remove.
+    removed_by = _join_all(parts_element, tabs, removeParts)
+    for part in parts_element:
+        part.reset_add_remove()
+        part.properties.removed_by_tab = removed_by.get(part.get_name(), {})
+        part.properties.limit_shapes = {}
+    try:
+        _join_all(parts_element, tabs, removeParts)
+    finally:
         for part in parts_element:
-            if part.get_name() == tab.freecad_object.Name:
-                tab_part = part
-#            else:
-            elif part.get_name() not in removeParts[keyid]:
-                other_parts.append(part)
-        if tab.tab_type == TabProperties.TYPE_TAB:
-            make_tab_join(tab, tab_part, other_parts)
-        elif tab.tab_type == TabProperties.TYPE_T_SLOT:
-            make_tslot_tab_join(tab, tab_part, other_parts)
-        elif tab.tab_type == TabProperties.TYPE_CONTINUOUS:
-            make_continuous_tab_joins(tab, tab_part, other_parts)
-        elif tab.tab_type == TabProperties.TYPE_FLEX:
-            flextab.make_flex_tab_join(tab, tab_part, other_parts)
-        else:
-            raise ValueError("Unknown tab type")
+            del part.properties.removed_by_tab
+            del part.properties.limit_shapes
     return parts_element
+
+
+def _join_all(parts_element, tabs, removeParts):
+    """Make every joint; return {part name: {id(tab): [shapes the joint removes from that part]}}."""
+    removed_by = {}
+    for tab in tabs:
+        before = {part.get_name(): len(part.toRemove) for part in parts_element}
+        _join_one(tab, parts_element, removeParts)
+        for part in parts_element:
+            new = part.toRemove[before[part.get_name()]:]
+            if new:
+                removed_by.setdefault(part.get_name(), {})[id(tab)] = list(new)
+    return removed_by
+
+
+def _join_one(tab, parts_element, removeParts):
+    tab_part = None
+    other_parts = []
+    keyid = str(tab.group_id)
+    for part in parts_element:
+        if part.get_name() == tab.freecad_object.Name:
+            tab_part = part
+#        else:
+        elif part.get_name() not in removeParts[keyid]:
+            other_parts.append(part)
+    if tab.tab_type == TabProperties.TYPE_TAB:
+        make_tab_join(tab, tab_part, other_parts)
+    elif tab.tab_type == TabProperties.TYPE_T_SLOT:
+        make_tslot_tab_join(tab, tab_part, other_parts)
+    elif tab.tab_type == TabProperties.TYPE_CONTINUOUS:
+        make_continuous_tab_joins(tab, tab_part, other_parts)
+    elif tab.tab_type == TabProperties.TYPE_FLEX:
+        flextab.make_flex_tab_join(tab, tab_part, other_parts)
+    else:
+        raise ValueError("Unknown tab type")
