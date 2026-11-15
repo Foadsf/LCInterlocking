@@ -165,6 +165,10 @@ class MultipleJoinGroup:
                     freecad_obj = document.addObject("Part::Feature", part.get_new_name())
                 fp.namesMapping[part.get_new_name()] = freecad_obj.Name
                 freecad_obj.Shape = part.get_shape()
+                pieces = len(freecad_obj.Shape.Solids)
+                if pieces > 1:  # a laser-cut panel is one piece; more means the joints cut part of it loose
+                    FreeCAD.Console.PrintWarning("%s: %s comes out as %d separate solids; check the joints that "
+                                                 "meet in it.\n" % (fp.Label, freecad_obj.Label, pieces))
                 freecad_objname_tokeep.append(freecad_obj.Name)
                 freecad_obj_generated.append(freecad_obj)
 

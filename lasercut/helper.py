@@ -132,6 +132,26 @@ def check_intersect(tab_to_add, face, part_interactor_properties):
     return part_shape_transformed.common(tab_to_add_transformed).Volume > 0.001, tab_to_add_transformed
 
 
+def limit_shape(material, tab):
+    """The part as the limit checks of joint `tab` see it: without what the other joints remove from it.
+    make_tabs_joins provides `removed_by_tab` ({id(tab): [shapes]}) in its second pass; otherwise the uncut part."""
+    shape = material.freecad_object.Shape
+    removed_by = getattr(material, 'removed_by_tab', None)
+    if not removed_by:
+        return shape
+    cache = material.limit_shapes
+    if id(tab) not in cache:
+        others = [s for key, shapes in removed_by.items() if key != id(tab) for s in shapes]
+        cache[id(tab)] = shape.cut(others) if others else shape
+    return cache[id(tab)]
+
+
+def check_inside(box, face, material):
+    """Whether `box` (in the joint's local frame) reaches material of the part, as limit_shape sees it."""
+    box_transformed = transform_part(box, face)
+    return limit_shape(material, face).common(box_transformed).Volume > 0.001, box_transformed
+
+
 def transform(part, referentiel_face, transform_matrix=None, y_invert = False):
     normal_face = referentiel_face.normalAt(0, 0)
     # original center is (0,0,0)
@@ -324,8 +344,8 @@ def check_limit_z(tab_face, width, pos_y, material_face, material_plane):
     box_z_minus = Part.makeBox(box_x_size, box_y_size, box_z_size)
     box_z_minus.translate(FreeCAD.Vector(0.005, pos_y - box_y_size/2.0, -box_z_size - material_face.thickness / 2.0))
 
-    z_plus_inside, toto1 = check_intersect(box_z_plus, tab_face, material_plane)
-    z_minus_inside, toto2 = check_intersect(box_z_minus, tab_face, material_plane)
+    z_plus_inside, toto1 = check_inside(box_z_plus, tab_face, material_plane)
+    z_minus_inside, toto2 = check_inside(box_z_minus, tab_face, material_plane)
 
     #shapeobj = FreeCAD.ActiveDocument.addObject("Part::Feature","tstupdds_plus")
     #shapeobj.Shape = toto1
@@ -350,8 +370,8 @@ def check_limit_y(tab_face, height, pos_y, width, material_plane):
     box_y_plus = Part.makeBox(box_x_size, box_y_size, box_z_size)
     box_y_plus.translate(FreeCAD.Vector(0.005, pos_y + width/2.0, -box_z_size / 2.0))
 
-    y_plus_inside, toto1 = check_intersect(box_y_plus, tab_face, material_plane)
-    y_minus_inside, toto2 = check_intersect(box_y_minus, tab_face, material_plane)
+    y_plus_inside, toto1 = check_inside(box_y_plus, tab_face, material_plane)
+    y_minus_inside, toto2 = check_inside(box_y_minus, tab_face, material_plane)
 
     #shapeobj = FreeCAD.ActiveDocument.addObject("Part::Feature","y_plus_inside")
     #shapeobj.Shape = toto1
@@ -376,8 +396,8 @@ def check_limit_y_on_for_tab(tab_face, height, pos_y, width, thickness, material
     box_y_plus = Part.makeBox(box_x_size, box_y_size, box_z_size)
     box_y_plus.translate(FreeCAD.Vector(-0.005 - box_x_size, pos_y + width/2.0, -box_z_size / 2.0))
 
-    y_plus_inside, toto1 = check_intersect(box_y_plus, tab_face, material_face)
-    y_minus_inside, toto2 = check_intersect(box_y_minus, tab_face, material_face)
+    y_plus_inside, toto1 = check_inside(box_y_plus, tab_face, material_face)
+    y_minus_inside, toto2 = check_inside(box_y_minus, tab_face, material_face)
 
     #shapeobj = FreeCAD.ActiveDocument.addObject("Part::Feature","y_plus_inside")
     #shapeobj.Shape = toto1

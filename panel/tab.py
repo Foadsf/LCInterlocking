@@ -84,8 +84,10 @@ class TabContinuousWidget(BaseTabWidget):
 
         self.widget_list = [WidgetValue(type=float, name="y_length", show_name="Width", widget=None),
                             WidgetValue(type=float, name="thickness", show_name="Thickness", widget=None),
+                            # from 1 (the whole edge is one tab): the default is 1, and a minimum of 2 clamped
+                            # only the face shown in the panel, so the faces of one joint got different counts
                             WidgetValue(type=float, name="tabs_number", show_name="Number of elements",
-                                            widget=None, interval_value=[2., 300.], step=1., decimals=0),
+                                            widget=None, interval_value=[1., 300.], step=1., decimals=0),
                             WidgetValue(type=bool, name="y_invert", show_name="Invert Y", widget=None),
                             WidgetValue(type=bool, name="dog_bone", show_name="Dog bone hole", widget=None),
                             WidgetValue(type=bool, name="tab_dog_bone", show_name="Tab dog bone hole", widget=None)]
